@@ -1,0 +1,175 @@
+# 数据集构建
+for(var_location in location) {
+  if(figure_joint == TRUE) {
+    figure_list <- list()
+  }
+  data_original_var_location <- dplyr::filter(data_original,location_name == var_location)
+  for(var_sex in sex){
+    year_1 <- year[1]
+    year_2 <- year[2]
+    #text_2(Number)呈现的数据构建
+    data_var_sex_1_number <- dplyr::filter(data_original_var_location, age_name == "All ages",sex_name == var_sex,year == year_1,metric_name == "Number") %>% dplyr::select("rei_name","val","upper","lower")
+    data_var_sex_2_number <- dplyr::filter(data_original_var_location, age_name == "All ages",sex_name == var_sex,year == year_2,metric_name == "Number") %>% dplyr::select("rei_name","val","upper","lower")
+    data_var_sex_number <- merge(data_var_sex_1_number,data_var_sex_2_number,by = "rei_name",suffixes = c("_year_1","_year_2"))
+    data_var_sex_number <- data_var_sex_number %>% 
+      mutate(val = ((val_year_2 - val_year_1)/val_year_1)*100,
+             #se_year_1 = (upper_year_1 - lower_year_1)/(2*1.96), 
+             #se_year_2 = (upper_year_2 - lower_year_2)/(2*1.96),
+             #se_pc = 100 * sqrt((se_year_2/val_year_1)^2 + ((val_year_2 * se_year_1) / val_year_1^2)^2),
+             #lower = val - 1.96*se_pc,
+             #upper = val + 1.96*se_pc,
+             text_2 = paste0(sprintf("%.2f",val))) %>%  dplyr::select("rei_name","text_2")
+    #text_3(Rate)呈现的数据构建!!!!!!(这里注意使用的是年龄标准化的率，后续可能要更改)
+    data_var_sex_1_rate <- dplyr::filter(data_original_var_location,sex_name == var_sex,year == year_1,metric_name == "Rate",age_name == "Age-standardized") %>% dplyr::select("rei_name","val","upper","lower")
+    data_var_sex_2_rate <- dplyr::filter(data_original_var_location,sex_name == var_sex,year == year_2,metric_name == "Rate",age_name == "Age-standardized") %>% dplyr::select("rei_name","val","upper","lower")
+    data_var_sex_rate <- merge(data_var_sex_1_rate,data_var_sex_2_rate,by = "rei_name",suffixes = c("_year_1","_year_2"))
+    data_var_sex_rate <- data_var_sex_rate %>% 
+      mutate(val = ((val_year_2 - val_year_1)/val_year_1)*100,
+             #se_year_1 = (upper_year_1 - lower_year_1)/(2*1.96), 
+             #se_year_2 = (upper_year_2 - lower_year_2)/(2*1.96),
+             #se_pc = 100 * sqrt((se_year_2/val_year_1)^2 + ((val_year_2 * se_year_1) / val_year_1^2)^2),
+             #lower = val - 1.96*se_pc,
+             #upper = val + 1.96*se_pc,
+             text_3 = paste0(sprintf("%.2f",val))) %>% dplyr::select("rei_name","text_3")
+    #主要结构的数据集构建!!!!!!(这里注意使用的是年龄标准化的率，后续可能要更改)
+    ##构建数据集
+    data_var_sex_1 <- dplyr::filter(data_original_var_location,sex_name == var_sex,year == year_1,metric_name == "Number",age_name == "All ages")
+    data_var_sex_2 <- dplyr::filter(data_original_var_location,sex_name == var_sex,year == year_2,metric_name == "Number",age_name == "All ages")
+    ##看是否包含同样的因素，并对其取并集
+    rei_year_1 <- data_var_sex_1$rei_name
+    rei_year_2 <- data_var_sex_2$rei_name
+    rei_year_1 %in% rei_year_2
+    rei_all <- base::union(rei_year_1,rei_year_2)
+    data_1 <- data.frame(rei_all)
+    data_1 <- rename(data_1,rei_name = rei_all)
+    ##获取year_1的Percentage排序
+    data_var_sex_1 <- data_var_sex_1[order(data_var_sex_1$val),]
+    data_var_sex_1$order_id <- nrow(data_var_sex_1):1
+    data_var_sex_1_order <- dplyr::select(data_var_sex_1,"rei_name","order_id","val","upper","lower","year")
+    ###构建符合要求的列序
+    data_var_sex_1_order$name_1 <- paste(data_var_sex_1_order$order_id,data_var_sex_1_order$rei_name)
+    data_var_sex_1_order$val_1 <- paste0(sprintf("%.2f",data_var_sex_1_order$val/1000000)," (",sprintf("%.2f",data_var_sex_1_order$lower/1000000)," to ",sprintf("%.2f",data_var_sex_1_order$upper/1000000),")")
+    data_var_sex_1_order <- data_var_sex_1_order[order(data_var_sex_1_order$order_id),]
+    data_var_sex_1_order$id <- nrow(data_var_sex_1_order):1
+    ###确定year_1最终纳入的危险因素名称
+    data_var_sex_1_order <- merge(data_1,data_var_sex_1_order,by = "rei_name",all.x = T) %>% dplyr::select("rei_name","order_id","id","name_1","val_1","year")
+    ##获取year_2的Percentage排序
+    data_var_sex_2 <-data_var_sex_2[order(data_var_sex_2$val),]
+    data_var_sex_2$order_id <- nrow(data_var_sex_2):1
+    data_var_sex_2_order <- dplyr::select(data_var_sex_2,"rei_name","order_id","val","upper","lower","year")
+    ###构建符合要求的列
+    data_var_sex_2_order$name_1 <- paste(data_var_sex_2_order$order_id,data_var_sex_2_order$rei_name)
+    data_var_sex_2_order$val_1 <- paste0(sprintf("%.2f",data_var_sex_2_order$val/1000000)," (",sprintf("%.2f",data_var_sex_2_order$lower/1000000)," to ",sprintf("%.2f",data_var_sex_2_order$upper/1000000),")")
+    data_var_sex_2_order <- data_var_sex_2_order[order(data_var_sex_2_order$order_id),]
+    data_var_sex_2_order$id <- nrow(data_var_sex_2_order):1
+    ###确定2023最终纳入的数据变量
+    data_var_sex_2_order <- merge(data_1,data_var_sex_2_order,by = "rei_name",all.x = T) %>% dplyr::select("rei_name","order_id","id","name_1","val_1","year")
+    ##升降处理
+    data_sj <- merge(dplyr::select(data_var_sex_1_order,"rei_name","order_id"),dplyr::select(data_var_sex_2_order,"rei_name","order_id"),by = "rei_name",suffixes = c("_year_1","_year_2"))
+    data_sj <- data_sj %>% 
+      dplyr::mutate(
+        sj = case_when(
+          (data_sj$order_id_year_1)-(data_sj$order_id_year_2)>0 ~ 1,
+          (data_sj$order_id_year_1)-(data_sj$order_id_year_2)==0 ~ 0,
+          (data_sj$order_id_year_1)-(data_sj$order_id_year_2)<0 ~ -1
+        )
+      )
+    data_sj <- select(data_sj,"rei_name","sj")
+    data_sj$sj <- factor(data_sj$sj,levels = c(1,0,-1))
+    ##数据合并
+    data_use <- rbind(data_var_sex_1_order,data_var_sex_2_order)
+    data_use <- merge(data_use,data_sj,by = "rei_name",all.x = T)
+    data_use <- merge(data_use,data_var_sex_number,by = "rei_name",all.x = T)
+    data_use <- merge(data_use,data_var_sex_rate,by = "rei_name",all.x = T)
+    ##处理
+    data_use$group <- ifelse(data_use$year==year_1,group_left,group_right)
+    data_use <- data_use %>% mutate(
+      name_1 = str_wrap(name_1, width = 35)
+    )
+    #绘图准备
+    ##参数计算
+    y_annote_text <- nrow(data_use)/2+y_annote_text_per
+    left_2_location_max <- group_left
+    left_2_location_min <- group_left-left_2_width
+    left_2_text_location <- group_left-left_2_width/2
+    left_1_location_max <- left_2_location_min-h_interval_width
+    left_1_location_min <- left_1_location_max-left_1_width
+    left_1_text_location <- left_1_location_max-left_1_width/2
+    right_1_location_min <- group_right
+    right_1_location_max <- group_right+right_1_width
+    right_1_text_location <- group_right+right_1_width/2
+    right_2_location_min <- right_1_location_max+h_interval_width
+    right_2_location_max <- right_2_location_min+right_2_width
+    right_2_text_location <- right_2_location_min+right_2_width/2
+    right_3_location_min <- right_2_location_max+h_interval_width
+    right_3_location_max <- right_3_location_min+right_3_width
+    right_3_text_location <- right_3_location_min+right_3_width/2
+    right_4_location_min <- right_3_location_max+h_interval_width
+    right_4_location_max <- right_4_location_min+right_4_width
+    right_4_text_location <- right_4_location_min+right_4_width/2
+    ##绘图
+    figure_var_sex <- ggplot(data = data_use,aes(x = group,y = id))+
+      #左2
+      geom_rect(data = data_use %>% filter(group == group_left),aes(xmin = left_2_location_min,xmax = left_2_location_max,ymin = id-rect_width,ymax = id+rect_width,fill = sj),color = "black",linewidth = geom_rect_line_width, alpha = rect_alpha_size)+
+      geom_text(data = data_use %>% filter(group == group_left),aes(x = left_2_text_location,y = id,label = val_1), size = geom_text_size)+
+      annotate("text",x = left_2_text_location, y = y_annote_text,label = "Number of DALYs 1990\n(million)", size = annote_text_size, fontface = "bold")+
+      #左1
+      geom_rect(data = data_use %>% filter(group == group_left),aes(xmin = left_1_location_min,xmax = left_1_location_max,ymin = id-rect_width,ymax = id+rect_width,fill = sj),color = "black",linewidth = geom_rect_line_width, alpha = rect_alpha_size)+
+      geom_text(data = data_use %>% filter(group == group_left),aes(x = left_1_text_location ,y = id,label = name_1), size = geom_text_size,
+                lineheight = 0.9)+
+      annotate("text",x = left_1_text_location, y = y_annote_text,label = "Leading risks 1990", size = annote_text_size, fontface = "bold")+
+      #右1
+      geom_rect(data = data_use %>% filter(group == group_right),aes(xmin = right_1_location_min,xmax = right_1_location_max,ymin = id-rect_width,ymax = id+rect_width,fill = sj),color = "black",linewidth = geom_rect_line_width, alpha = rect_alpha_size)+
+      geom_text(data = data_use %>% filter(group == group_right),aes(x = right_1_text_location,y = id,label = name_1), size = geom_text_size)+
+      annotate("text",x = right_1_text_location, y = y_annote_text,label = "Leading risks 2023", size = annote_text_size, fontface = "bold")+
+      #右2
+      geom_rect(data = data_use %>% filter(group == group_right),aes(xmin = right_2_location_min,xmax = right_2_location_max,ymin = id-rect_width,ymax = id+rect_width,fill = sj),color = "black",linewidth = geom_rect_line_width, alpha = rect_alpha_size)+
+      geom_text(data = data_use %>% filter(group == group_right),aes(x = right_2_text_location,y = id,label = val_1), size = geom_text_size)+
+      annotate("text",x = right_2_text_location, y = y_annote_text,label = "Number of DALYs 2023\n(million)", size = annote_text_size, fontface = "bold")+
+      #配对线
+      geom_line(data = data_use %>% filter(rei_name %in% rei_all),aes(x = group,group=rei_name,color = sj, linetype = sj),linewidth = line_width,show.legend = F)+
+      # text_2
+      geom_rect(data = data_use %>% filter(group == group_right),aes(xmin = right_3_location_min,xmax = right_3_location_max,ymin = id-rect_width,ymax = id+rect_width,fill = sj),color = "black",linewidth = geom_rect_line_width, alpha = rect_alpha_size)+
+      geom_text(data = data_use %>% filter(group == group_right),aes(x = right_3_text_location,y = id,label = text_2), size = geom_text_size)+
+      annotate("text",x = right_3_text_location, y = y_annote_text,label = "Percentage change in\nnumber of DALYs,\n1990 - 2023", size = annote_text_size, fontface = "bold")+
+      # text_3
+      geom_rect(data = data_use %>% filter(group == group_right),aes(xmin = right_4_location_min,xmax = right_4_location_max,ymin = id-rect_width,ymax = id+rect_width,fill = sj),color = "black",linewidth = geom_rect_line_width, alpha = rect_alpha_size)+
+      geom_text(data = data_use %>% filter(group == group_right),aes(x = right_4_text_location,y = id,label = text_3), size = geom_text_size)+
+      annotate("text",x = right_4_text_location, y = y_annote_text,label = "Percentage change in\nage-standardised DALY rate,\n1990 - 2023", size = annote_text_size, fontface = "bold")+
+      # 配色修改
+      scale_color_manual(values = color_value)+
+      scale_fill_manual(values = color_value)+
+      scale_x_discrete(expand = c(0.01,0.01)) +
+      theme_void()+
+      coord_cartesian(clip = "off") + 
+      theme(legend.position = "none",
+            plot.margin = margin(t = 5, r = 5, b = 5, l = 5, unit = "mm"),
+            panel.spacing.y = unit(0.5, "pt"))
+    if (figure_joint == FALSE) {
+      figure_var_sex_labeled <- plot_grid(
+        figure_var_sex,
+        labels = var_location
+      )
+      figure_name <- paste0(var_location, "_", var_sex)
+      ggsave(
+        filename = paste0(figure_save_path, figure_name, ".jpeg"),
+        plot     = figure_var_sex_labeled,
+        width    = 50,
+        height   = 40,
+        units    = "cm"
+      )
+    } else if(figure_joint == TRUE){
+      figure_name <- paste0(var_location, "_", var_sex)
+      figure_list[[figure_name]] <- figure_var_sex
+      figure_all <- plot_grid(
+        plotlist = figure_list,
+        nrow = length(figure_list),
+        ncol = 1,
+        labels = c("A","B","C"),
+        label_size = 25
+      )
+       ggsave(paste0(figure_save_path,figure_name,".jpeg"),plot = figure_all,width = 70,height = 53,units = "cm",dpi = 300)
+      #ggsave(paste0(figure_save_path,figure_name,".pdf"),plot = figure_all,width = 50,height = 40,units = "cm")
+    }
+  }
+}
